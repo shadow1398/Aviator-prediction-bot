@@ -4,62 +4,42 @@ import json
 import pandas as pd
 import time
 
-Telegram bot token
 TOKEN = "7631130153:AAGOShF-RsyxPeGwSGExu8UTUgVxtkgI_ow"
-
-Telegram chat ID
 CHAT_ID = "7525050818"
+API_ENDPOINT = "https://api.binance.com/api/v3/klines"
+SYMBOL = "BTCUSDT"
+INTERVAL = "1h"
+LIMIT = 1000
 
-Define a function to send messages to Telegram
-def send_message(message):
+def send_telegram_message(message):
+    """Send a message to Telegram"""
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    data = {
-        "chat_id": CHAT_ID,
-        "text": message
-    }
+    data = {"chat_id": CHAT_ID, "text": message}
     response = requests.post(url, json=data)
     return response.json()
 
-Define a function to get updates from Telegram
-def get_updates():
+def get_telegram_updates():
+    """Get updates from Telegram"""
     url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
     response = requests.get(url)
     return response.json()
 
-Define a function to generate signals
 def generate_signal():
-    # Define the API endpoint for the cryptocurrency data
-    api_endpoint = "https://api.binance.com/api/v3/klines"
-
-    # Define the parameters for the API request
-    params = {
-        "symbol": "BTCUSDT",
-        "interval": "1h",
-        "limit": 1000
-    }
-
-    # Make the API request and get the response
-    response = requests.get(api_endpoint, params=params)
-
-    # Parse the response as JSON
+    """Generate a buy/sell signal based on SMA"""
+    params = {"symbol": SYMBOL, "interval": INTERVAL, "limit": LIMIT}
+    response = requests.get(API_ENDPOINT, params=params)
     data = json.loads(response.text)
-
-    # Convert the data to a Pandas DataFrame
     df = pd.DataFrame(data)
-
-    # Calculate the Simple Moving Averages (SMAs)
+    
     df["sma_50"] = df["close"].rolling(window=50).mean()
     df["sma_200"] = df["close"].rolling(window=200).mean()
-
-    # Generate the buy and sell signals
+    
     df["signal"] = 0
     df.loc[(df["sma_50"] > df["sma_200"]) & (df["close"] > df["sma_200"]), "signal"] = 1
     df.loc[(df["sma_50"] < df["sma_200"]) & (df["close"] < df["sma_200"]), "signal"] = -1
-
-    # Get the latest signal
+    
     latest_signal = df["signal"].iloc[-1]
-
-    # Return the signal message
+    
     if latest_signal == 1:
         return "Buy signal: BTC/USD"
     elif latest_signal == -1:
@@ -67,13 +47,10 @@ def generate_signal():
     else:
         return "No signal: BTC/USD"
 
-Main loop
-while True:
-    # Generate the signal
-    signal_message = generate_signal()
+def main():
+    while True:
+        signal_message = generate_signal()
+        send_telegram_message(signal_message)
+        time.sleep(60)  # wait for 1 minute
 
-    # Send the signal to Telegram
-    send_message(signal_message)
 
-    # Wait for 1 minute before generating the next signal
-    time.sleep(60_seconds)
